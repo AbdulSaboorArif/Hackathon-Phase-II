@@ -14,6 +14,7 @@ export default function EditTaskPage() {
     }
   }, [auth.isAuthenticated, router]);
 
+  
   useEffect(() => {
     if (id) {
       router.push(`/tasks/${id}`);
