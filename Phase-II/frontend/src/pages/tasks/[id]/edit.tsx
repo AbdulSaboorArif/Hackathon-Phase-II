@@ -13,8 +13,6 @@ export default function EditTaskPage() {
       router.push("/login");
     }
   }, [auth.isAuthenticated, router]);
-
-  
   useEffect(() => {
     if (id) {
       router.push(`/tasks/${id}`);

@@ -3,7 +3,7 @@ import { useRouter } from "next/navigation";
 import { useParams } from "next/navigation";
 import { useState, useEffect } from "react";
 import { Task } from "../../../lib/types";
-import { TaskDetails } from "../../../components/tasks/TaskDetails";
+import { TaskDetails } from "../../../components/Form_tasks/TaskDetails";
 
 export default function TaskDetailPage() {
   const router = useRouter();

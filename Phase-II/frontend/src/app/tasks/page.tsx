@@ -3,9 +3,9 @@ import { useAuth } from "../../services/auth";
 import { ProtectedRoute } from "../../components/auth/ProtectedRoute";
 import { useState, useEffect } from "react";
 import { Task, TaskCreate } from "../../lib/types";
-import { TaskList } from "../../components/tasks/TaskList";
-import { TaskForm } from "../../components/tasks/TaskForm";
-import { TaskFilters } from "../../components/tasks/TaskFilters";
+import { TaskList } from "../../components/Form_tasks/TaskList";
+import { TaskForm } from "../../components/Form_tasks/TaskForm";
+import { TaskFilters } from "../../components/Form_tasks/TaskFilters";
 import { useRouter } from "next/navigation";
 
 export default function TasksPage() {

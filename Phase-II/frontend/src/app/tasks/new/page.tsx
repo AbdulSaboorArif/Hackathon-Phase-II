@@ -1,6 +1,6 @@
 "use client";
 import { useRouter } from "next/navigation";
-import { TaskForm } from "../../../components/tasks/TaskForm";
+import { TaskForm } from "../../../components/Form_tasks/TaskForm";
 import { useState } from "react";
 
 export default function NewTaskPage() {
