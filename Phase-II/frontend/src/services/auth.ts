@@ -1,4 +1,3 @@
-import { createContext, useContext, useEffect, useState } from "react";
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 
@@ -24,7 +23,7 @@ const useAuthStore = create<AuthState>()(
     (set, get) => ({
       user: null,
       token: null,
-      isLoading: true,
+      isLoading: false,
       isAuthenticated: false,
 
       login: async (email: string, password: string) => {
@@ -42,20 +41,29 @@ const useAuthStore = create<AuthState>()(
           }
 
           const data = await response.json();
-          setToken(data.access_token);
+          const token = data.access_token;
+
+          // Store token
+          if (token) {
+            localStorage.setItem("token", token);
+            set({ token, isAuthenticated: true });
+          }
 
           // Fetch user info
           const userResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/auth/user`, {
             headers: {
-              "Authorization": `Bearer ${data.access_token}`,
+              "Authorization": `Bearer ${token}`,
             },
           });
 
           if (userResponse.ok) {
             const userData = await userResponse.json();
-            setUser({
-              id: userData.id,
-              email: userData.email,
+            set({
+              user: {
+                id: userData.id,
+                email: userData.email,
+              },
+              isAuthenticated: true
             });
           }
         } catch (error) {
@@ -78,20 +86,29 @@ const useAuthStore = create<AuthState>()(
           }
 
           const data = await response.json();
-          setToken(data.access_token);
+          const token = data.access_token;
+
+          // Store token
+          if (token) {
+            localStorage.setItem("token", token);
+            set({ token, isAuthenticated: true });
+          }
 
           // Fetch user info
           const userResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/auth/user`, {
             headers: {
-              "Authorization": `Bearer ${data.access_token}`,
+              "Authorization": `Bearer ${token}`,
             },
           });
 
           if (userResponse.ok) {
-            const userData = await response.json();
-            setUser({
-              id: userData.id,
-              email: userData.email,
+            const userData = await userResponse.json();
+            set({
+              user: {
+                id: userData.id,
+                email: userData.email,
+              },
+              isAuthenticated: true
             });
           }
         } catch (error) {
@@ -100,8 +117,12 @@ const useAuthStore = create<AuthState>()(
       },
 
       logout: () => {
-        setToken(null);
-        setUser(null);
+        localStorage.removeItem("token");
+        set({
+          token: null,
+          user: null,
+          isAuthenticated: false
+        });
       },
 
       setUser: (user: User | null) => {
@@ -125,84 +146,28 @@ const useAuthStore = create<AuthState>()(
         token: state.token,
         isAuthenticated: state.isAuthenticated,
       }),
+      skipHydration: true, // Skip hydration to prevent SSR issues
     }
   )
 );
 
-export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [initialized, setInitialized] = useState(false);
-
-  useEffect(() => {
-    const token = localStorage.getItem("token");
-    if (token) {
-      useAuthStore.setState({
-        token,
-        isAuthenticated: true,
-      });
-
-      // Verify token
-      const verifyToken = async () => {
-        try {
-          const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/auth/user`, {
-            headers: {
-              "Authorization": `Bearer ${token}`,
-            },
-          });
-
-          if (response.ok) {
-            const userData = await response.json();
-            useAuthStore.setState({
-              user: {
-                id: userData.id,
-                email: userData.email,
-              },
-              isLoading: false,
-            });
-          } else {
-            useAuthStore.setState({
-              token: null,
-              user: null,
-              isAuthenticated: false,
-              isLoading: false,
-            });
-          }
-        } catch (error) {
-          useAuthStore.setState({
-            token: null,
-            user: null,
-            isAuthenticated: false,
-            isLoading: false,
-          });
-        }
-      };
-
-      verifyToken();
-    } else {
-      useAuthStore.setState({
-        isLoading: false,
-      });
-    }
-
-    setInitialized(true);
-  }, []);
-
-  if (!initialized) {
-    return <div>Loading...</div>;
-  }
-
-  return <>{children}</>;
-};
-
+// Export individual selectors to avoid creating new objects on every render
 export const useAuth = () => {
-  return useAuthStore((state) => ({
-    user: state.user,
-    token: state.token,
-    isLoading: state.isLoading,
-    isAuthenticated: state.isAuthenticated,
-    login: state.login,
-    register: state.register,
-    logout: state.logout,
-  }));
-};
+  const user = useAuthStore((state) => state.user);
+  const token = useAuthStore((state) => state.token);
+  const isLoading = useAuthStore((state) => state.isLoading);
+  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
+  const login = useAuthStore((state) => state.login);
+  const register = useAuthStore((state) => state.register);
+  const logout = useAuthStore((state) => state.logout);
 
-export const AuthContext = createContext<AuthState | undefined>(undefined);
+  return {
+    user,
+    token,
+    isLoading,
+    isAuthenticated,
+    login,
+    register,
+    logout,
+  };
+};

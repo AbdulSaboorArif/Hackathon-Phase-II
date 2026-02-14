@@ -1,3 +1,7 @@
+@tailwind utilities;
+@tailwind utilities;
+@tailwind utilities;
+
 @import "tailwindcss";
 
 :root {
@@ -25,13 +29,11 @@ body {
   font-family: Arial, Helvetica, sans-serif;
 }
 
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
 
 @layer base {
   * {
-    @apply border-border;
+    @apply border-gray-200;
+
   }
 
   body {

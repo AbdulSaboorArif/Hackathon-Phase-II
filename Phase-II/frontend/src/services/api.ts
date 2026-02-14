@@ -129,10 +129,10 @@ export const tasksAPI = {
   },
 
   async completeTask(id: number) {
-    return api.patch(`/tasks/${id}/complete`);
+    return api.patch(`/tasks/${id}/complete`, {});
   },
 
   async incompleteTask(id: number) {
-    return api.patch(`/tasks/${id}/incomplete`);
+    return api.patch(`/tasks/${id}/incomplete`, {});
   },
 };

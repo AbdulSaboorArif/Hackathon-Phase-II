@@ -1,4 +1,5 @@
-import React, { useState } from "react";
+"use client";
+import React from "react";
 import { STATUS_OPTIONS } from "../../lib/constants";
 
 interface TaskFiltersProps {
@@ -10,42 +11,24 @@ export const TaskFilters: React.FC<TaskFiltersProps> = ({
   onFilterChange,
   currentFilter,
 }) => {
-  const [showOptions, setShowOptions] = useState(false);
-
-  const handleFilterChange = (status: string) => {
-    onFilterChange(status);
-    setShowOptions(false);
-  };
-
   return (
-    <div className="bg-white rounded-lg shadow p-4 mb-6">
-      <div className="flex items-center justify-between mb-4">
-        <h3 className="text-lg font-semibold text-gray-800">Filters</h3>
-        <button
-          onClick={() => setShowOptions(!showOptions)}
-          className="text-blue-600 hover:text-blue-800 text-sm"
-        >
-          {showOptions ? "Hide" : "Show"} Options
-        </button>
+    <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
+      <h3 className="text-sm font-semibold text-gray-700 mb-3">Filter Tasks</h3>
+      <div className="flex flex-wrap gap-2">
+        {STATUS_OPTIONS.map((option) => (
+          <button
+            key={option.value}
+            onClick={() => onFilterChange(option.value)}
+            className={`px-4 py-2 text-sm font-medium rounded-lg transition-all duration-200 ${
+              currentFilter === option.value
+                ? "bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-md"
+                : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+            }`}
+          >
+            {option.label}
+          </button>
+        ))}
       </div>
-
-      {showOptions && (
-        <div className="space-y-2">
-          {STATUS_OPTIONS.map((option) => (
-            <button
-              key={option.value}
-              onClick={() => handleFilterChange(option.value)}
-              className={`w-full px-3 py-2 text-left rounded hover:bg-gray-100 ${
-                currentFilter === option.value
-                  ? "bg-blue-50 border border-blue-200"
-                  : "border border-transparent"
-              }`}
-            >
-              {option.label}
-            </button>
-          ))}
-        </div>
-      )}
     </div>
   );
 };

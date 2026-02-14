@@ -1,5 +1,6 @@
+"use client";
 import { useEffect } from "react";
-import { useAuth } from "../services/auth";
+import { useAuth } from "../../services/auth";
 import { useRouter } from "next/navigation";
 
 interface ProtectedRouteProps {
@@ -28,8 +29,6 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
   }
 
   return isAuthenticated ? (
-    <>{children}>
-  ) : (
-    <div></div>
-  );
+    <>{children}</>
+  ) : null;
 };

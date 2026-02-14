@@ -1,37 +1,23 @@
-import React, { createContext, useContext, ReactNode } from "react";
-import { useAuth } from "../services/auth";
-
-interface AuthContextType {
-  user: {
-    id: number;
-    email: string;
-  } | null;
-  isAuthenticated: boolean;
-  login: (email: string, password: string) => Promise<void>;
-  register: (email: string, password: string) => Promise<void>;
-  logout: () => void;
-}
-
-const AuthContext = createContext<AuthContextType | undefined>(undefined);
+'use client';
+import React, { useEffect, useState } from "react";
+import { useAuth } from "../../services/auth";
 
 interface AuthProviderProps {
-  children: ReactNode;
+  children: React.ReactNode;
 }
 
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
-  const auth = useAuth();
+  const [mounted, setMounted] = useState(false);
 
-  return (
-    <AuthContext.Provider value={auth}>
-      {children}
-    </AuthContext.Provider>
-  );
-};
+  // Only run on client side to avoid hydration mismatch
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
-export const useAuthContext = () => {
-  const context = useContext(AuthContext);
-  if (context === undefined) {
-    throw new Error("useAuthContext must be used within an AuthProvider");
+  // Don't render anything until mounted on client
+  if (!mounted) {
+    return <>{children}</>;
   }
-  return context;
+
+  return <>{children}</>;
 };

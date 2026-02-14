@@ -1,6 +1,6 @@
+"use client";
 import React, { useState } from "react";
 import { TaskCreate } from "../../lib/types";
-import { validateEmail, validatePassword } from "../../lib/utils";
 
 interface TaskFormProps {
   onSubmit: (task: TaskCreate) => void;
@@ -74,13 +74,13 @@ export const TaskForm: React.FC<TaskFormProps> = ({
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
+    <form onSubmit={handleSubmit} className="space-y-5">
       <div>
         <label
           htmlFor="title"
-          className="block text-sm font-medium text-gray-700 mb-1"
+          className="block text-sm font-semibold text-gray-700 mb-2"
         >
-          Title *
+          Task Title <span className="text-red-500">*</span>
         </label>
         <input
           type="text"
@@ -88,41 +88,54 @@ export const TaskForm: React.FC<TaskFormProps> = ({
           name="title"
           value={formData.title}
           onChange={handleChange}
-          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
-          placeholder="Enter task title"
+          className="w-full px-4 py-3 border border-gray-300 text-black rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all duration-200"
+          placeholder="e.g., Review project proposal"
         />
         {errors.title && (
-          <p className="text-red-600 text-sm mt-1">{errors.title}</p>
+          <p className="text-red-600 text-sm mt-2 flex items-center space-x-1">
+            <span>⚠️</span>
+            <span>{errors.title}</span> 
+          </p>
         )}
       </div>
 
       <div>
         <label
           htmlFor="description"
-          className="block text-sm font-medium text-gray-700 mb-1"
+          className="block text-sm font-semibold text-gray-700 mb-2"
         >
-          Description
+          Description <span className="text-gray-400 text-xs">(optional)</span>
         </label>
         <textarea
           id="description"
           name="description"
           value={formData.description}
           onChange={handleChange}
-          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none"
-          rows={3}
-          placeholder="Enter task description (optional)"
+          className="w-full px-4 py-3 border border-gray-300 text-black rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all duration-200 resize-none"
+          rows={4}
+          placeholder="Add more details about this task..."
         />
         {errors.description && (
-          <p className="text-red-600 text-sm mt-1">{errors.description}</p>
+          <p className="text-red-600 text-sm mt-2 flex items-center space-x-1">
+            <span>⚠️</span>
+            <span>{errors.description}</span>
+          </p>
         )}
       </div>
 
       <button
         type="submit"
         disabled={isSubmitting}
-        className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50"
+        className="w-full py-3 px-4 bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-semibold rounded-lg hover:shadow-lg transform hover:scale-[1.02] transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
       >
-        {isSubmitting ? "Creating..." : submitButtonText}
+        {isSubmitting ? (
+          <span className="flex items-center justify-center space-x-2">
+            <div className="animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent"></div>
+            <span>Creating...</span>
+          </span>
+        ) : (
+          submitButtonText
+        )}
       </button>
     </form>
   );
