@@ -1,4 +1,4 @@
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000" || "https://hackathon-phase-ii-alpha.vercel.app/api/auth/login";
 
 export const api = {
   async get(endpoint: string, options: RequestInit = {}) {
@@ -91,7 +91,7 @@ export const api = {
 
 export const authAPI = {
   async login(email: string, password: string) {
-    return api.post("/auth/login", { email, password });
+    return api.post("/api/auth/login", { email, password });
   },
 
   async register(email: string, password: string) {
