@@ -30,8 +30,8 @@ export const api = {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        ...getAuthHeaders(),
-        ...options.headers,
+         ...(getAuthHeaders() as HeadersInit),
+         ...(options.headers as HeadersInit),
       },
       body: JSON.stringify(data),
       ...options,
@@ -49,8 +49,8 @@ export const api = {
       method: "PUT",
       headers: {
         "Content-Type": "application/json",
-        ...getAuthHeaders(),
-        ...options.headers,
+         ...(getAuthHeaders() as HeadersInit),
+         ...(options.headers as HeadersInit),
       },
       body: JSON.stringify(data),
       ...options,
@@ -68,8 +68,8 @@ export const api = {
       method: "PATCH",
       headers: {
         "Content-Type": "application/json",
-        ...getAuthHeaders(),
-        ...options.headers,
+        ...(getAuthHeaders() as HeadersInit),
+        ...(options.headers as HeadersInit),
       },
       body: JSON.stringify(data),
       ...options,
@@ -87,8 +87,8 @@ export const api = {
       method: "DELETE",
       headers: {
         "Content-Type": "application/json",
-        ...getAuthHeaders(),
-        ...options.headers,
+         ...(getAuthHeaders() as HeadersInit),
+         ...(options.headers as HeadersInit),
       },
       ...options,
     });
