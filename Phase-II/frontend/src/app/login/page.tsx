@@ -1,23 +1,10 @@
 "use client";
 import { AuthForm } from "../../components/auth/AuthForm";
 import { AuthProvider } from "../../components/auth/AuthProvider";
-import { useState } from "react";
 import { useRouter } from "next/navigation";
 
 export default function LoginPage() {
-  const [loading, setLoading] = useState(false);
   const router = useRouter();
-
-  const handleLogin = async () => {
-  setLoading(true);
-  const res = await fetch("/login", {
-    method: "POST"
-  })
-
-  if (res.ok) {
-    router.push("/dashboard")
-  }
-}
 
   return (
     <AuthProvider>
@@ -40,10 +27,7 @@ export default function LoginPage() {
 
           {/* Auth Form Card */}
           <div className="bg-white rounded-2xl shadow-xl border border-gray-200 p-8">
-            <AuthForm
-              type="login"
-              onSuccess={handleLogin}
-            />
+            <AuthForm type="login" />
           </div>
 
           {/* Sign Up Link */}

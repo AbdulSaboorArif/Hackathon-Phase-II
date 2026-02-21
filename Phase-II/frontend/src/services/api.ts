@@ -1,10 +1,18 @@
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000" || "https://hackathon-phase-ii-alpha.vercel.app/login";
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api";
+
+// Helper to get auth headers
+const getAuthHeaders = () => {
+  if (typeof window === "undefined") return {};
+  const token = localStorage.getItem("token");
+  return token ? { Authorization: `Bearer ${token}` } : {};
+};
 
 export const api = {
   async get(endpoint: string, options: RequestInit = {}) {
     const response = await fetch(`${API_BASE_URL}${endpoint}`, {
       headers: {
         "Content-Type": "application/json",
+        ...getAuthHeaders(),
         ...options.headers,
       },
       ...options,
@@ -22,6 +30,7 @@ export const api = {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
+        ...getAuthHeaders(),
         ...options.headers,
       },
       body: JSON.stringify(data),
@@ -40,6 +49,7 @@ export const api = {
       method: "PUT",
       headers: {
         "Content-Type": "application/json",
+        ...getAuthHeaders(),
         ...options.headers,
       },
       body: JSON.stringify(data),
@@ -58,6 +68,7 @@ export const api = {
       method: "PATCH",
       headers: {
         "Content-Type": "application/json",
+        ...getAuthHeaders(),
         ...options.headers,
       },
       body: JSON.stringify(data),
@@ -76,6 +87,7 @@ export const api = {
       method: "DELETE",
       headers: {
         "Content-Type": "application/json",
+        ...getAuthHeaders(),
         ...options.headers,
       },
       ...options,
@@ -99,11 +111,7 @@ export const authAPI = {
   },
 
   async getCurrentUser() {
-    return api.get("/auth/user", {
-      headers: {
-        Authorization: `Bearer ${localStorage.getItem("token")}`,
-      },
-    });
+    return api.get("/auth/user");
   },
 };
 
