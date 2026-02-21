@@ -117,30 +117,30 @@ export const authAPI = {
 
 export const tasksAPI = {
   async getTasks() {
-    return api.get("/tasks");
+    return api.get("/api/tasks");
   },
 
   async getTask(id: number) {
-    return api.get(`/tasks/${id}`);
+    return api.get(`/api/tasks/${id}`);
   },
 
   async createTask(task: { title: string; description?: string }) {
-    return api.post("/tasks", task);
+    return api.post("/api/tasks", task);
   },
 
   async updateTask(id: number, task: { title?: string; description?: string; is_completed?: boolean }) {
-    return api.put(`/tasks/${id}`, task);
+    return api.put(`/api/tasks/${id}`, task);
   },
 
   async deleteTask(id: number) {
-    return api.delete(`/tasks/${id}`);
+    return api.delete(`/api/tasks/${id}`);
   },
 
   async completeTask(id: number) {
-    return api.patch(`/tasks/${id}/complete`, {});
+    return api.patch(`/api/tasks/${id}/complete`, {});
   },
 
   async incompleteTask(id: number) {
-    return api.patch(`/tasks/${id}/incomplete`, {});
+    return api.patch(`/api/tasks/${id}/incomplete`, {});
   },
 };
