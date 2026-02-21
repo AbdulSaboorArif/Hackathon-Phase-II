@@ -12,8 +12,8 @@ export const api = {
     const response = await fetch(`${API_BASE_URL}${endpoint}`, {
       headers: {
         "Content-Type": "application/json",
-        ...getAuthHeaders(),
-        ...options.headers,
+         ...(getAuthHeaders() as HeadersInit),
+         ...(options.headers as HeadersInit),
       },
       ...options,
     });
