@@ -9,7 +9,7 @@ export default function NewTaskPage() {
 
   const handleCreateTask = async (task: { title: string; description?: string }) => {
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/tasks`, {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/tasks/`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

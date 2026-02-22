@@ -21,7 +21,7 @@ export default function TasksPage() {
   useEffect(() => {
     const fetchTasks = async () => {
       try {
-        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/tasks`, {
+        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/tasks/`, {
           headers: {
             Authorization: `Bearer ${localStorage.getItem("token")}`,
           },
@@ -47,7 +47,7 @@ export default function TasksPage() {
 
   const handleCreateTask = async (taskData: TaskCreate) => {
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/tasks`, {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/tasks/`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

@@ -1,11 +1,22 @@
 const getApiBaseUrl = () => {
   // Use environment variable if set (production)
   if (process.env.NEXT_PUBLIC_API_URL) {
-    return process.env.NEXT_PUBLIC_API_URL;
+    let url = process.env.NEXT_PUBLIC_API_URL;
+
+    // Force HTTPS in production (not localhost)
+    if (typeof window !== 'undefined' &&
+        window.location.protocol === 'https:' &&
+        !url.includes('localhost') &&
+        url.startsWith('https://')) {
+      url = url.replace('https://', 'https://');
+      console.warn('API URL converted from HTTP to HTTPS for security:', url);
+    }
+
+    return url;
   }
 
   // Fallback for local development
-  return 'http://localhost:8000/api';
+  return process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api';
 };
 
 const API_BASE_URL = getApiBaseUrl();
