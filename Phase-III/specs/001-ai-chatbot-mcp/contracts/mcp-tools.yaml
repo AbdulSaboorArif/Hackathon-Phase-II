@@ -1,0 +1,916 @@
+# MCP Tools Specification
+
+**Feature**: 001-ai-chatbot-mcp
+**Date**: 2026-02-28
+**Status**: Phase 1 Design
+**Related**: [spec.md](../spec.md) | [plan.md](../plan.md) | [data-model.md](../data-model.md)
+
+## Overview
+
+This document defines the Model Context Protocol (MCP) tools that enable the AI agent to perform task operations. These tools provide a structured interface between the OpenAI agent and the backend task management system.
+
+**Design Principles**:
+- Stateless: Tools hold no state between invocations
+- User Isolation: All tools require user_id parameter
+- Type Safety: Pydantic schemas for all parameters
+- Error Handling: Structured error responses
+- Idempotent: Safe to retry on failure
+
+---
+
+## Tool Catalog
+
+| Tool Name | Purpose | Parameters | Returns |
+|-----------|---------|------------|---------|
+| add_task | Create a new task | user_id, title, description? | Task object |
+| list_tasks | List user's tasks | user_id, status? | List of tasks |
+| complete_task | Mark task as complete | user_id, task_id | Task object |
+| delete_task | Delete a task | user_id, task_id | Success message |
+| update_task | Update task details | user_id, task_id, title?, description? | Task object |
+
+---
+
+## Tool Definitions
+
+### 1. add_task
+
+**Purpose**: Create a new task for the user.
+
+**Function Signature**:
+```python
+async def add_task(
+    user_id: int,
+    title: str,
+    description: Optional[str] = None
+) -> Dict[str, Any]:
+    """
+    Create a new task for the user.
+
+    Args:
+        user_id: ID of the user (from JWT token)
+        title: Task title (required, 1-255 characters)
+        description: Optional task description (max 10,000 characters)
+
+    Returns:
+        Dict containing task details:
+        {
+            "success": true,
+            "task": {
+                "id": 123,
+                "user_id": 456,
+                "title": "Buy milk",
+                "description": "Get 2% milk from store",
+                "is_completed": false,
+                "created_at": "2026-02-28T10:30:00Z",
+                "updated_at": "2026-02-28T10:30:00Z",
+                "completed_at": null
+            }
+        }
+
+    Raises:
+        ValueError: If title is empty or too long
+        DatabaseError: If database operation fails
+    """
+```
+
+**Input Schema** (Pydantic):
+```python
+from pydantic import BaseModel, Field
+from typing import Optional
+
+class AddTaskInput(BaseModel):
+    user_id: int = Field(..., description="User ID from JWT token", gt=0)
+    title: str = Field(..., description="Task title", min_length=1, max_length=255)
+    description: Optional[str] = Field(None, description="Task description", max_length=10000)
+
+    class Config:
+        json_schema_extra = {
+            "examples": [
+                {
+                    "user_id": 123,
+                    "title": "Buy milk",
+                    "description": "Get 2% milk from the grocery store"
+                }
+            ]
+        }
+```
+
+**Output Schema**:
+```python
+class TaskOutput(BaseModel):
+    id: int
+    user_id: int
+    title: str
+    description: Optional[str]
+    is_completed: bool
+    created_at: str  # ISO 8601 format
+    updated_at: str  # ISO 8601 format
+    completed_at: Optional[str]  # ISO 8601 format
+
+class AddTaskOutput(BaseModel):
+    success: bool
+    task: TaskOutput
+```
+
+**Error Responses**:
+```python
+# Empty title
+{
+    "success": false,
+    "error": "Title cannot be empty",
+    "error_code": "INVALID_INPUT"
+}
+
+# Title too long
+{
+    "success": false,
+    "error": "Title must be 255 characters or less",
+    "error_code": "INVALID_INPUT"
+}
+
+# Database error
+{
+    "success": false,
+    "error": "Failed to create task",
+    "error_code": "DATABASE_ERROR"
+}
+```
+
+**Example Usage**:
+```python
+# Agent invokes tool
+result = await add_task(
+    user_id=123,
+    title="Buy milk",
+    description="Get 2% milk from store"
+)
+
+# Agent receives response
+{
+    "success": true,
+    "task": {
+        "id": 456,
+        "user_id": 123,
+        "title": "Buy milk",
+        "description": "Get 2% milk from store",
+        "is_completed": false,
+        "created_at": "2026-02-28T10:30:00Z",
+        "updated_at": "2026-02-28T10:30:00Z",
+        "completed_at": null
+    }
+}
+
+# Agent generates natural language response
+"I've added 'Buy milk' to your task list!"
+```
+
+---
+
+### 2. list_tasks
+
+**Purpose**: Retrieve all tasks for the user, optionally filtered by completion status.
+
+**Function Signature**:
+```python
+async def list_tasks(
+    user_id: int,
+    status: Optional[str] = None
+) -> Dict[str, Any]:
+    """
+    List all tasks for the user.
+
+    Args:
+        user_id: ID of the user (from JWT token)
+        status: Optional filter - "completed", "incomplete", or None (all tasks)
+
+    Returns:
+        Dict containing list of tasks:
+        {
+            "success": true,
+            "tasks": [
+                {
+                    "id": 123,
+                    "title": "Buy milk",
+                    "is_completed": false,
+                    ...
+                },
+                ...
+            ],
+            "count": 5
+        }
+
+    Raises:
+        ValueError: If status is invalid
+        DatabaseError: If database operation fails
+    """
+```
+
+**Input Schema**:
+```python
+from typing import Literal
+
+class ListTasksInput(BaseModel):
+    user_id: int = Field(..., description="User ID from JWT token", gt=0)
+    status: Optional[Literal["completed", "incomplete"]] = Field(
+        None,
+        description="Filter by completion status"
+    )
+
+    class Config:
+        json_schema_extra = {
+            "examples": [
+                {"user_id": 123, "status": None},
+                {"user_id": 123, "status": "incomplete"},
+                {"user_id": 123, "status": "completed"}
+            ]
+        }
+```
+
+**Output Schema**:
+```python
+class ListTasksOutput(BaseModel):
+    success: bool
+    tasks: List[TaskOutput]
+    count: int
+```
+
+**Error Responses**:
+```python
+# Invalid status
+{
+    "success": false,
+    "error": "Status must be 'completed', 'incomplete', or null",
+    "error_code": "INVALID_INPUT"
+}
+
+# Database error
+{
+    "success": false,
+    "error": "Failed to retrieve tasks",
+    "error_code": "DATABASE_ERROR"
+}
+```
+
+**Example Usage**:
+```python
+# List all tasks
+result = await list_tasks(user_id=123, status=None)
+
+# List incomplete tasks only
+result = await list_tasks(user_id=123, status="incomplete")
+
+# Agent receives response
+{
+    "success": true,
+    "tasks": [
+        {
+            "id": 1,
+            "title": "Buy milk",
+            "is_completed": false,
+            ...
+        },
+        {
+            "id": 2,
+            "title": "Call mom",
+            "is_completed": false,
+            ...
+        },
+        {
+            "id": 3,
+            "title": "Pay bills",
+            "is_completed": true,
+            ...
+        }
+    ],
+    "count": 3
+}
+
+# Agent generates natural language response
+"You have 3 tasks:
+1. Buy milk (incomplete)
+2. Call mom (incomplete)
+3. Pay bills (completed)"
+```
+
+---
+
+### 3. complete_task
+
+**Purpose**: Mark a task as complete.
+
+**Function Signature**:
+```python
+async def complete_task(
+    user_id: int,
+    task_id: int
+) -> Dict[str, Any]:
+    """
+    Mark a task as complete.
+
+    Args:
+        user_id: ID of the user (from JWT token)
+        task_id: ID of the task to complete
+
+    Returns:
+        Dict containing updated task:
+        {
+            "success": true,
+            "task": {
+                "id": 123,
+                "is_completed": true,
+                "completed_at": "2026-02-28T10:30:00Z",
+                ...
+            }
+        }
+
+    Raises:
+        NotFoundError: If task not found or not owned by user
+        DatabaseError: If database operation fails
+    """
+```
+
+**Input Schema**:
+```python
+class CompleteTaskInput(BaseModel):
+    user_id: int = Field(..., description="User ID from JWT token", gt=0)
+    task_id: int = Field(..., description="Task ID to complete", gt=0)
+
+    class Config:
+        json_schema_extra = {
+            "examples": [
+                {"user_id": 123, "task_id": 456}
+            ]
+        }
+```
+
+**Output Schema**:
+```python
+class CompleteTaskOutput(BaseModel):
+    success: bool
+    task: TaskOutput
+```
+
+**Error Responses**:
+```python
+# Task not found
+{
+    "success": false,
+    "error": "Task not found",
+    "error_code": "NOT_FOUND"
+}
+
+# Task not owned by user
+{
+    "success": false,
+    "error": "Task not found",  # Don't leak existence
+    "error_code": "NOT_FOUND"
+}
+
+# Database error
+{
+    "success": false,
+    "error": "Failed to complete task",
+    "error_code": "DATABASE_ERROR"
+}
+```
+
+**Example Usage**:
+```python
+# Complete task
+result = await complete_task(user_id=123, task_id=456)
+
+# Agent receives response
+{
+    "success": true,
+    "task": {
+        "id": 456,
+        "title": "Buy milk",
+        "is_completed": true,
+        "completed_at": "2026-02-28T10:30:00Z",
+        ...
+    }
+}
+
+# Agent generates natural language response
+"Great! I've marked 'Buy milk' as complete."
+```
+
+---
+
+### 4. delete_task
+
+**Purpose**: Delete a task permanently.
+
+**Function Signature**:
+```python
+async def delete_task(
+    user_id: int,
+    task_id: int
+) -> Dict[str, Any]:
+    """
+    Delete a task permanently.
+
+    Args:
+        user_id: ID of the user (from JWT token)
+        task_id: ID of the task to delete
+
+    Returns:
+        Dict containing success message:
+        {
+            "success": true,
+            "message": "Task deleted successfully"
+        }
+
+    Raises:
+        NotFoundError: If task not found or not owned by user
+        DatabaseError: If database operation fails
+    """
+```
+
+**Input Schema**:
+```python
+class DeleteTaskInput(BaseModel):
+    user_id: int = Field(..., description="User ID from JWT token", gt=0)
+    task_id: int = Field(..., description="Task ID to delete", gt=0)
+
+    class Config:
+        json_schema_extra = {
+            "examples": [
+                {"user_id": 123, "task_id": 456}
+            ]
+        }
+```
+
+**Output Schema**:
+```python
+class DeleteTaskOutput(BaseModel):
+    success: bool
+    message: str
+```
+
+**Error Responses**:
+```python
+# Task not found
+{
+    "success": false,
+    "error": "Task not found",
+    "error_code": "NOT_FOUND"
+}
+
+# Database error
+{
+    "success": false,
+    "error": "Failed to delete task",
+    "error_code": "DATABASE_ERROR"
+}
+```
+
+**Example Usage**:
+```python
+# Delete task
+result = await delete_task(user_id=123, task_id=456)
+
+# Agent receives response
+{
+    "success": true,
+    "message": "Task deleted successfully"
+}
+
+# Agent generates natural language response
+"I've deleted the task 'Buy milk' from your list."
+```
+
+---
+
+### 5. update_task
+
+**Purpose**: Update task title and/or description.
+
+**Function Signature**:
+```python
+async def update_task(
+    user_id: int,
+    task_id: int,
+    title: Optional[str] = None,
+    description: Optional[str] = None
+) -> Dict[str, Any]:
+    """
+    Update task title and/or description.
+
+    Args:
+        user_id: ID of the user (from JWT token)
+        task_id: ID of the task to update
+        title: New title (optional, 1-255 characters)
+        description: New description (optional, max 10,000 characters)
+
+    Returns:
+        Dict containing updated task:
+        {
+            "success": true,
+            "task": {
+                "id": 123,
+                "title": "Buy 2% milk",
+                "description": "Updated description",
+                ...
+            }
+        }
+
+    Raises:
+        ValueError: If both title and description are None
+        ValueError: If title is empty or too long
+        NotFoundError: If task not found or not owned by user
+        DatabaseError: If database operation fails
+    """
+```
+
+**Input Schema**:
+```python
+class UpdateTaskInput(BaseModel):
+    user_id: int = Field(..., description="User ID from JWT token", gt=0)
+    task_id: int = Field(..., description="Task ID to update", gt=0)
+    title: Optional[str] = Field(None, description="New task title", min_length=1, max_length=255)
+    description: Optional[str] = Field(None, description="New task description", max_length=10000)
+
+    @validator('title', 'description')
+    def at_least_one_field(cls, v, values):
+        if 'title' in values and values['title'] is None and v is None:
+            raise ValueError('At least one of title or description must be provided')
+        return v
+
+    class Config:
+        json_schema_extra = {
+            "examples": [
+                {"user_id": 123, "task_id": 456, "title": "Buy 2% milk"},
+                {"user_id": 123, "task_id": 456, "description": "Get from Whole Foods"},
+                {"user_id": 123, "task_id": 456, "title": "Buy 2% milk", "description": "Get from Whole Foods"}
+            ]
+        }
+```
+
+**Output Schema**:
+```python
+class UpdateTaskOutput(BaseModel):
+    success: bool
+    task: TaskOutput
+```
+
+**Error Responses**:
+```python
+# No fields provided
+{
+    "success": false,
+    "error": "At least one of title or description must be provided",
+    "error_code": "INVALID_INPUT"
+}
+
+# Empty title
+{
+    "success": false,
+    "error": "Title cannot be empty",
+    "error_code": "INVALID_INPUT"
+}
+
+# Task not found
+{
+    "success": false,
+    "error": "Task not found",
+    "error_code": "NOT_FOUND"
+}
+
+# Database error
+{
+    "success": false,
+    "error": "Failed to update task",
+    "error_code": "DATABASE_ERROR"
+}
+```
+
+**Example Usage**:
+```python
+# Update title only
+result = await update_task(user_id=123, task_id=456, title="Buy 2% milk")
+
+# Update description only
+result = await update_task(user_id=123, task_id=456, description="Get from Whole Foods")
+
+# Update both
+result = await update_task(
+    user_id=123,
+    task_id=456,
+    title="Buy 2% milk",
+    description="Get from Whole Foods"
+)
+
+# Agent receives response
+{
+    "success": true,
+    "task": {
+        "id": 456,
+        "title": "Buy 2% milk",
+        "description": "Get from Whole Foods",
+        ...
+    }
+}
+
+# Agent generates natural language response
+"I've updated the task to 'Buy 2% milk'."
+```
+
+---
+
+## MCP Server Implementation
+
+### Server Setup
+
+```python
+# backend/src/mcp/server.py
+from mcp import Server
+from mcp.types import Tool, TextContent
+from typing import Any, Sequence
+
+# Initialize MCP server
+mcp_server = Server("todo-mcp-server")
+
+# Register tools
+@mcp_server.list_tools()
+async def list_tools() -> list[Tool]:
+    """List all available MCP tools"""
+    return [
+        Tool(
+            name="add_task",
+            description="Create a new task for the user",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "user_id": {"type": "integer", "description": "User ID from JWT token"},
+                    "title": {"type": "string", "description": "Task title", "minLength": 1, "maxLength": 255},
+                    "description": {"type": "string", "description": "Task description (optional)", "maxLength": 10000}
+                },
+                "required": ["user_id", "title"]
+            }
+        ),
+        Tool(
+            name="list_tasks",
+            description="List all tasks for the user",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "user_id": {"type": "integer", "description": "User ID from JWT token"},
+                    "status": {"type": "string", "enum": ["completed", "incomplete"], "description": "Filter by status (optional)"}
+                },
+                "required": ["user_id"]
+            }
+        ),
+        Tool(
+            name="complete_task",
+            description="Mark a task as complete",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "user_id": {"type": "integer", "description": "User ID from JWT token"},
+                    "task_id": {"type": "integer", "description": "Task ID to complete"}
+                },
+                "required": ["user_id", "task_id"]
+            }
+        ),
+        Tool(
+            name="delete_task",
+            description="Delete a task permanently",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "user_id": {"type": "integer", "description": "User ID from JWT token"},
+                    "task_id": {"type": "integer", "description": "Task ID to delete"}
+                },
+                "required": ["user_id", "task_id"]
+            }
+        ),
+        Tool(
+            name="update_task",
+            description="Update task title and/or description",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "user_id": {"type": "integer", "description": "User ID from JWT token"},
+                    "task_id": {"type": "integer", "description": "Task ID to update"},
+                    "title": {"type": "string", "description": "New title (optional)", "minLength": 1, "maxLength": 255},
+                    "description": {"type": "string", "description": "New description (optional)", "maxLength": 10000}
+                },
+                "required": ["user_id", "task_id"]
+            }
+        )
+    ]
+
+@mcp_server.call_tool()
+async def call_tool(name: str, arguments: dict[str, Any]) -> Sequence[TextContent]:
+    """Handle tool invocations"""
+    if name == "add_task":
+        result = await add_task(**arguments)
+    elif name == "list_tasks":
+        result = await list_tasks(**arguments)
+    elif name == "complete_task":
+        result = await complete_task(**arguments)
+    elif name == "delete_task":
+        result = await delete_task(**arguments)
+    elif name == "update_task":
+        result = await update_task(**arguments)
+    else:
+        raise ValueError(f"Unknown tool: {name}")
+
+    return [TextContent(type="text", text=json.dumps(result))]
+```
+
+---
+
+## Tool Integration with OpenAI Agent
+
+### Agent Configuration
+
+```python
+# backend/src/agent/config.py
+from openai import OpenAI
+
+client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+
+# Create agent with MCP tools
+agent = client.beta.assistants.create(
+    name="Todo Assistant",
+    instructions="""You are a helpful assistant that manages todo tasks.
+    You have access to tools to add, list, complete, delete, and update tasks.
+    Always confirm actions with natural language responses.
+    Be friendly and concise.""",
+    model="gpt-4",
+    tools=[
+        {"type": "function", "function": tool_to_openai_function(tool)}
+        for tool in await mcp_server.list_tools()
+    ]
+)
+```
+
+### Agent Execution
+
+```python
+# backend/src/agent/runner.py
+async def run_agent_with_tools(
+    messages: List[Dict[str, str]],
+    user_id: int
+) -> str:
+    """Run agent with MCP tools"""
+    # Create thread
+    thread = client.beta.threads.create()
+
+    # Add messages to thread
+    for msg in messages:
+        client.beta.threads.messages.create(
+            thread_id=thread.id,
+            role=msg["role"],
+            content=msg["content"]
+        )
+
+    # Run agent
+    run = client.beta.threads.runs.create(
+        thread_id=thread.id,
+        assistant_id=agent.id
+    )
+
+    # Wait for completion and handle tool calls
+    while run.status in ["queued", "in_progress", "requires_action"]:
+        if run.status == "requires_action":
+            # Agent wants to call a tool
+            tool_calls = run.required_action.submit_tool_outputs.tool_calls
+
+            tool_outputs = []
+            for tool_call in tool_calls:
+                # Add user_id to arguments
+                arguments = json.loads(tool_call.function.arguments)
+                arguments["user_id"] = user_id
+
+                # Call MCP tool
+                result = await mcp_server.call_tool(
+                    tool_call.function.name,
+                    arguments
+                )
+
+                tool_outputs.append({
+                    "tool_call_id": tool_call.id,
+                    "output": result[0].text
+                })
+
+            # Submit tool outputs
+            run = client.beta.threads.runs.submit_tool_outputs(
+                thread_id=thread.id,
+                run_id=run.id,
+                tool_outputs=tool_outputs
+            )
+
+        # Poll for updates
+        await asyncio.sleep(0.5)
+        run = client.beta.threads.runs.retrieve(thread_id=thread.id, run_id=run.id)
+
+    # Get final response
+    messages = client.beta.threads.messages.list(thread_id=thread.id)
+    return messages.data[0].content[0].text.value
+```
+
+---
+
+## Error Handling Strategy
+
+### Error Codes
+
+| Code | Description | HTTP Status | User Message |
+|------|-------------|-------------|--------------|
+| INVALID_INPUT | Invalid parameters | 400 | "Invalid input: {details}" |
+| NOT_FOUND | Task not found | 404 | "Task not found" |
+| DATABASE_ERROR | Database operation failed | 500 | "Something went wrong. Please try again." |
+| UNAUTHORIZED | User not authorized | 403 | "You don't have permission to access this task" |
+
+### Error Response Format
+
+```python
+{
+    "success": false,
+    "error": "Human-readable error message",
+    "error_code": "ERROR_CODE",
+    "details": {  # Optional, for debugging
+        "field": "title",
+        "constraint": "max_length",
+        "value": 300
+    }
+}
+```
+
+---
+
+## Testing Strategy
+
+### Unit Tests
+
+```python
+# tests/test_mcp_tools.py
+import pytest
+from backend.src.mcp.tools import add_task, list_tasks, complete_task
+
+@pytest.mark.asyncio
+async def test_add_task_success(db_session):
+    """Test successful task creation"""
+    result = await add_task(user_id=1, title="Buy milk", description="2% milk")
+    assert result["success"] is True
+    assert result["task"]["title"] == "Buy milk"
+    assert result["task"]["user_id"] == 1
+
+@pytest.mark.asyncio
+async def test_add_task_empty_title(db_session):
+    """Test task creation with empty title"""
+    result = await add_task(user_id=1, title="")
+    assert result["success"] is False
+    assert result["error_code"] == "INVALID_INPUT"
+
+@pytest.mark.asyncio
+async def test_list_tasks_with_filter(db_session):
+    """Test listing tasks with status filter"""
+    # Create tasks
+    await add_task(user_id=1, title="Task 1")
+    await add_task(user_id=1, title="Task 2")
+    await complete_task(user_id=1, task_id=1)
+
+    # List incomplete tasks
+    result = await list_tasks(user_id=1, status="incomplete")
+    assert result["success"] is True
+    assert result["count"] == 1
+    assert result["tasks"][0]["title"] == "Task 2"
+
+@pytest.mark.asyncio
+async def test_complete_task_not_found(db_session):
+    """Test completing non-existent task"""
+    result = await complete_task(user_id=1, task_id=999)
+    assert result["success"] is False
+    assert result["error_code"] == "NOT_FOUND"
+
+@pytest.mark.asyncio
+async def test_user_isolation(db_session):
+    """Test user cannot access other user's tasks"""
+    # User 1 creates task
+    task = await add_task(user_id=1, title="User 1 task")
+    task_id = task["task"]["id"]
+
+    # User 2 tries to complete it
+    result = await complete_task(user_id=2, task_id=task_id)
+    assert result["success"] is False
+    assert result["error_code"] == "NOT_FOUND"
+```
+
+---
+
+## Summary
+
+**Tools Defined**: 5 (add_task, list_tasks, complete_task, delete_task, update_task)
+**Input Validation**: Pydantic schemas with type safety
+**Error Handling**: Structured error responses with codes
+**User Isolation**: Enforced via user_id parameter
+**Stateless**: No state retained between invocations
+
+**Next Steps**:
+1. Create quickstart.md for developer setup
+2. Review all Phase 1 deliverables
+3. Run /sp.tasks to generate implementation tasks
