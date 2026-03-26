@@ -1,0 +1,495 @@
+openapi: 3.0.3
+info:
+  title: AI-Powered Todo Chatbot API
+  description: |
+    Chat endpoint for natural language task management using OpenAI Agents SDK and MCP tools.
+
+    **Authentication**: All endpoints require JWT token in Authorization header.
+    **User Isolation**: All operations filtered by user_id from JWT token.
+    **Stateless**: Server holds no state between requests - all conversation state in database.
+  version: 1.0.0
+  contact:
+    name: API Support
+    email: support@example.com
+
+servers:
+  - url: http://localhost:8000/api
+    description: Local development server
+  - url: https://api.example.com/api
+    description: Production server
+
+security:
+  - BearerAuth: []
+
+tags:
+  - name: chat
+    description: Chat endpoints for natural language task management
+  - name: conversations
+    description: Conversation management endpoints
+
+paths:
+  /chat:
+    post:
+      tags:
+        - chat
+      summary: Send chat message
+      description: |
+        Send a natural language message to the AI assistant. The assistant will:
+        1. Parse the user's intent
+        2. Invoke appropriate MCP tools (add_task, list_tasks, etc.)
+        3. Return a natural language response
+
+        **Stateless**: Each request is independent. Conversation history is fetched from database.
+      operationId: sendChatMessage
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChatRequest'
+            examples:
+              addTask:
+                summary: Add a task
+                value:
+                  conversation_id: 1
+                  message: "Add buy milk to my tasks"
+              listTasks:
+                summary: List tasks
+                value:
+                  conversation_id: 1
+                  message: "Show me all my tasks"
+              completeTask:
+                summary: Complete a task
+                value:
+                  conversation_id: 1
+                  message: "Mark task 3 as complete"
+              multiAction:
+                summary: Multiple actions
+                value:
+                  conversation_id: 1
+                  message: "Add buy milk and show my tasks"
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChatResponse'
+              examples:
+                taskAdded:
+                  summary: Task added successfully
+                  value:
+                    response: "I've added 'Buy milk' to your task list!"
+                    conversation_id: 1
+                    message_id: 42
+                tasksList:
+                  summary: Tasks listed
+                  value:
+                    response: "You have 3 tasks:\n1. Buy milk (incomplete)\n2. Call mom (incomplete)\n3. Pay bills (completed)"
+                    conversation_id: 1
+                    message_id: 43
+                taskCompleted:
+                  summary: Task completed
+                  value:
+                    response: "Great! I've marked 'Buy milk' as complete."
+                    conversation_id: 1
+                    message_id: 44
+        '400':
+          description: Bad request - invalid input
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                missingConversationId:
+                  summary: Missing conversation_id
+                  value:
+                    detail: "conversation_id is required"
+                emptyMessage:
+                  summary: Empty message
+                  value:
+                    detail: "message cannot be empty"
+        '401':
+          description: Unauthorized - invalid or missing JWT token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                missingToken:
+                  summary: Missing token
+                  value:
+                    detail: "Missing or invalid Authorization header"
+                expiredToken:
+                  summary: Expired token
+                  value:
+                    detail: "Token expired"
+        '403':
+          description: Forbidden - user does not own this conversation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                notOwner:
+                  summary: Not conversation owner
+                  value:
+                    detail: "You do not have permission to access this conversation"
+        '404':
+          description: Not found - conversation does not exist
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                conversationNotFound:
+                  summary: Conversation not found
+                  value:
+                    detail: "Conversation not found"
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                serverError:
+                  summary: Server error
+                  value:
+                    detail: "Internal server error"
+
+  /conversations:
+    get:
+      tags:
+        - conversations
+      summary: List user conversations
+      description: Get all conversations for the authenticated user, sorted by most recent activity
+      operationId: listConversations
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: skip
+          in: query
+          description: Number of conversations to skip (pagination)
+          required: false
+          schema:
+            type: integer
+            default: 0
+            minimum: 0
+        - name: limit
+          in: query
+          description: Maximum number of conversations to return
+          required: false
+          schema:
+            type: integer
+            default: 20
+            minimum: 1
+            maximum: 100
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ConversationResponse'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+    post:
+      tags:
+        - conversations
+      summary: Create new conversation
+      description: Create a new conversation for the authenticated user
+      operationId: createConversation
+      security:
+        - BearerAuth: []
+      responses:
+        '201':
+          description: Conversation created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConversationResponse'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /conversations/{conversation_id}:
+    get:
+      tags:
+        - conversations
+      summary: Get conversation details
+      description: Get details of a specific conversation
+      operationId: getConversation
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: conversation_id
+          in: path
+          description: Conversation ID
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConversationResponse'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+    delete:
+      tags:
+        - conversations
+      summary: Delete conversation
+      description: Delete a conversation and all its messages
+      operationId: deleteConversation
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: conversation_id
+          in: path
+          description: Conversation ID
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Conversation deleted successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Conversation deleted successfully"
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /conversations/{conversation_id}/messages:
+    get:
+      tags:
+        - conversations
+      summary: Get conversation messages
+      description: Get all messages in a conversation
+      operationId: getConversationMessages
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: conversation_id
+          in: path
+          description: Conversation ID
+          required: true
+          schema:
+            type: integer
+        - name: limit
+          in: query
+          description: Maximum number of messages to return
+          required: false
+          schema:
+            type: integer
+            default: 50
+            minimum: 1
+            maximum: 100
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/MessageResponse'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: |
+        JWT token obtained from /api/auth/login or /api/auth/register.
+        Include in Authorization header as: `Bearer <token>`
+
+  schemas:
+    ChatRequest:
+      type: object
+      required:
+        - conversation_id
+        - message
+      properties:
+        conversation_id:
+          type: integer
+          description: ID of the conversation
+          example: 1
+        message:
+          type: string
+          description: User's natural language message
+          minLength: 1
+          maxLength: 10000
+          example: "Add buy milk to my tasks"
+
+    ChatResponse:
+      type: object
+      required:
+        - response
+        - conversation_id
+        - message_id
+      properties:
+        response:
+          type: string
+          description: AI assistant's natural language response
+          example: "I've added 'Buy milk' to your task list!"
+        conversation_id:
+          type: integer
+          description: ID of the conversation
+          example: 1
+        message_id:
+          type: integer
+          description: ID of the assistant's message
+          example: 42
+
+    ConversationResponse:
+      type: object
+      required:
+        - id
+        - user_id
+        - created_at
+        - updated_at
+      properties:
+        id:
+          type: integer
+          description: Conversation ID
+          example: 1
+        user_id:
+          type: integer
+          description: User ID (owner)
+          example: 123
+        created_at:
+          type: string
+          format: date-time
+          description: Timestamp when conversation was created
+          example: "2026-02-28T10:30:00Z"
+        updated_at:
+          type: string
+          format: date-time
+          description: Timestamp when conversation was last updated
+          example: "2026-02-28T14:45:00Z"
+        message_count:
+          type: integer
+          description: Number of messages in conversation (optional)
+          example: 10
+
+    MessageResponse:
+      type: object
+      required:
+        - id
+        - conversation_id
+        - user_id
+        - role
+        - content
+        - created_at
+      properties:
+        id:
+          type: integer
+          description: Message ID
+          example: 42
+        conversation_id:
+          type: integer
+          description: Conversation ID
+          example: 1
+        user_id:
+          type: integer
+          description: User ID (owner)
+          example: 123
+        role:
+          type: string
+          enum: [user, assistant, system]
+          description: Message role
+          example: "user"
+        content:
+          type: string
+          description: Message content
+          example: "Add buy milk to my tasks"
+        created_at:
+          type: string
+          format: date-time
+          description: Timestamp when message was created
+          example: "2026-02-28T10:30:00Z"
+
+    ErrorResponse:
+      type: object
+      required:
+        - detail
+      properties:
+        detail:
+          type: string
+          description: Error message
+          example: "Invalid token"
+
+  responses:
+    UnauthorizedError:
+      description: Unauthorized - invalid or missing JWT token
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            detail: "Invalid token"
+
+    ForbiddenError:
+      description: Forbidden - user does not have permission
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            detail: "You do not have permission to access this resource"
+
+    NotFoundError:
+      description: Not found - resource does not exist
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            detail: "Resource not found"
+
+    InternalServerError:
+      description: Internal server error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            detail: "Internal server error"
